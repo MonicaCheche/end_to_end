@@ -63,5 +63,5 @@ The `standalone_test` directory contains the files used to verify the AXI-Lite b
 2.  **Hardware Handoff**:  The `.xsa` file was exported to Vitis, which contains the hardware's address map[cite: 1].
 3.  **Software Driver (`helloworld.c`):** 
     *   Directly writes to the memory-mapped offsets mentioned above[cite: 1].
-    *   Reads back the hardware result and compares it against a software XOR calculation to ensure the AXI bridge is transparent and accurate[cite: 1].
-    *   Validation is confirmed via UART terminal output[cite: 1].
+    *   Reads back the hardware result and compares it against a software XOR calculation to ensure the AXI bridge is transparent and accurate[cite: 1] using **Xil_out32 Xil_in32**.
+      
