@@ -1,31 +1,45 @@
 # Hardware Validation of Zynq-7000 AXI-Lite Crypto IP #
 
-This project implements a custom hardware accelerator for basic XOR-based encryption/decryption. The IP is designed with an **AXI-Lite interface**, allowing a Zynq-7000 processing system (PS) to control hardware registers via software.
+This project implements a custom hardware accelerator for basic XOR-based encryption/decryption. The IP is designed with an **AXI-Lite interface**, allowing a Zynq-7000 processing system (PS) to control hardware registers via software. 
+
+The project has evolved from a bare-metal (**Standalone**) hardware-in-the-loop verification into a full-stack Embedded Linux environment (**PetaLinux**), featuring a custom **Linux Kernel Module (char device driver)** and a **userspace verification application**.
+
+---
 
 ## Project Structure ##
 
 ```text
 .
-
-├── standalone_test
-│   ├── Screenshot from 2026-05-14 05-10-10.png
-│   ├── vitis
-│   │   ├── helloworld.c
-│   │   ├── lscript.ld
-│   │   └── platform.c
-│   └── vivado
-│       ├── design_1.hwh
-│       ├── design_1_wrapper.bit
-│       └── design_1_wrapper.xsa
-├── Verilog
-│   ├── crypto.v
-│   ├── README.md
-│   └── test_crypto.v
-└── Vivado_xsct_test
-    ├── block_design.png
-    ├── Hardware Validation of a Zynq-7000 AXI-Lite Crypto IP via Vivado and XSCT.odt
-    └── vivado_validation.png
-```
+├── end_to_end_first_stage
+│   ├── petalinux                    # Embedded Linux Full-Stack Files
+│   │   ├── configs                  # Subsystem & Hardware Kconfig backups
+│   │   │   ├── Kconfig
+│   │   │   └── Kconfig.syshw
+│   │   ├── driver                   # Custom Linux Character Device Driver Source
+│   │   │   ├── crypto-driver.bb     # Yocto/PetaLinux BitBake Recipe
+│   │   │   ├── crypto-driver.c      # Kernel Module handling MMIO and file operations
+│   │   │   └── Makefile
+│   │   ├── rootfsconfigs            # Root File System Configuration templates
+│   │   ├── usrspace                 # Userspace Validation Application
+│   │   │   ├── crypto-test.bb       # App BitBake Recipe
+│   │   │   ├── crypto-test.c        # Tests hardware via /dev/crypto-driver
+│   │   │   └── Makefile
+│   │   ├── system.xsa               # Unified Xilinx Support Archive (Hardware Source)
+│   │   └── Screenshot from 2026-05-18 21-28-07.png
+│   ├── standalone_test              # Bare-Metal Hardware-in-the-loop Validation
+│   │   ├── vitis                    # Bare-metal test stack (helloworld C source)
+│   │   │   ├── helloworld.c
+│   │   │   ├── lscript.ld
+│   │   │   └── platform.c
+│   │   └── vivado                   # Exported Hardware Hand-off data (.bit, .xsa)
+│   │       ├── design_1.hwh
+│   │       ├── design_1_wrapper.bit
+│   │       └── design_1_wrapper.xsa
+│   └── Verilog                      # Pure RTL Core Source Files
+│       ├── crypto.v                 # Top-level module with AXI-Lite slave bridge
+│       ├── README.md
+│       └── test_crypto.v            # Initial simulation testbench
+└── README.md                        # Master Documentation
 
 ## Hardware Architecture: The AXI-Lite Wrapper ##
 
@@ -65,3 +79,25 @@ The `standalone_test` directory contains the files used to verify the AXI-Lite b
     *   Directly writes to the memory-mapped offsets mentioned above[cite: 1].
     *   Reads back the hardware result and compares it against a software XOR calculation to ensure the AXI bridge is transparent and accurate[cite: 1] using **Xil_out32 Xil_in32**.
       
+## Full-Stack PetaLinux Bring-Up (Embedded OS) ##
+To scale the project into a true production-like infrastructure, a custom embedded OS pipeline was built using Xilinx PetaLinux tools.
+
+### 1. Device Tree Integration (system-user.dtsi) ###
+The AXI Crypto IP block is registered into the Linux device tree framework under the AMBA bus loop. This notifies the Linux Kernel about the hardware's physical base address (0x43C00000) and address range layout during boot time.
+
+### 2. Custom Linux Kernel Module (crypto-driver.c) ###
+Instead of allowing userspace to touch dangerous raw memory, a robust Character Device Driver was engineered:
+
+Resource Mapping: The driver claims the hardware memory region using request_mem_region() and maps it safely into virtual kernel memory spaces via ioremap().
+
+File Operations Handlers: Implements standard POSIX filesystem operations (open, release, read, write, ioctl).
+
+Memory Safety: Seamlessly handles the architectural boundaries between hardware registers, kernel memory space, and user memory spaces via proper streaming loops.
+
+### 3. Userspace Testing Application (crypto-test.c) ###
+A validation test application is baked directly into the PetaLinux root filesystem image (rootfs):
+
+It accesses the physical crypto hardware smoothly by calling a standard open("/dev/crypto-driver", O_RDWR) system call.
+
+It passes down arbitrary processing buffers, monitors execution status, retrieves the encrypted hardware results, and runs validation checkers to confirm full data-path precision under standard Linux process constraints.
+
