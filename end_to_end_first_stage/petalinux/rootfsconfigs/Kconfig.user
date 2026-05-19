@@ -1,0 +1,18 @@
+menu "user packages " 
+config crypto-driver  
+	 bool "crypto-driver"
+	 help
+	
+config crypto-test  
+	 bool "crypto-test"
+	 help
+	
+config gpio-demo  
+	 bool "gpio-demo"
+	 help
+	
+config peekpoke  
+	 bool "peekpoke"
+	 help
+	
+endmenu
